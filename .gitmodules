@@ -1,0 +1,6 @@
+[submodule "lib/evilplot"]
+	path = lib/evilplot
+	url = git@github.com:julianmichael/evilplot.git
+[submodule "lib/qasrl-modeling"]
+	path = lib/qasrl-modeling
+	url = git@github.com:julianmichael/qasrl-modeling.git

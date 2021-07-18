@@ -1,0 +1,3 @@
+package qasrl.roles.browse
+
+trait FeatureServiceCompanionPlatformExtensions
