@@ -58,3 +58,17 @@ mill -i qasrl-roles.browse.serve --data conll08-lemma --mode test --domain local
 This will visualize the models that have results reported in the paper (if you have run them; see
 [`scripts/replicate.sh`](scripts/replicate.sh)). To automatically reconstruct all missing rolesets,
 run the browser command with the `--all` flag added (it will take a while if you need all of them).
+
+## More?
+
+There's a lot more functionality in this repository for related experiments, such as clustering on
+lexical (masked language modeling based) features, inducing predicate senses, and jointly inducing
+semantic roles and predicate senses. The results of these experiments weren't too great, but they
+might be an interesting starting or reference point for others interested in similar problems.
+I haven't done much in the way of documentation, so if you're interested in exploring more, reusing
+any of the code or algorithms, or building on this work, please
+[get in touch](mailto:julianjohnmichael@gmail.com).
+
+## Citation
+
+Bibtex coming soon via the ACL Anthology.
