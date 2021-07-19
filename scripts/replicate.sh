@@ -1,10 +1,9 @@
 #!/bin/bash
 
-BASE=`basename $0`
-pushd $BASE/..
+BASE=`basename $0`/..
+pushd $BASE
 
-git submodule init
-git submodule update
+git submodule update --init
 
 # publish local branch of evilplot (I had to update the scalajs version)
 pushd lib/evilplot
@@ -15,15 +14,13 @@ popd
 python3 scripts/check_ldc.py
 
 # Download the predicted question distributions.
-# To produce these yourself, see scripts/run_qgen.sh
+# To produce these yourself, stop here and run scripts/run_qgen.sh instead of this block
 mkdir -p experiments/conll08/input/qg
 pushd experiments/conll08/input/qg
 curl https://www.dropbox.com/sh/tzok99c9wxq24c1/AADtnarghu5shMnIWjh5yMQwa?dl=1 -L -O -J
 unzip qg.zip
 rm qg.zip
 popd
-
-pushd ..
 
 run_lemma () { ./scripts/roles.sh run --data conll08-lemma --mode test --model "$@" }
 run_sense () { ./scripts/roles.sh run --data conll08-sense --mode test --model "$@" }
@@ -64,7 +61,5 @@ run_lemma "arg/mnd->qent+pent" # HUM-QQ +lex +MI
 ./scripts/roles.sh compare --data conll08-lemma --mode test \
                    --model arg/mnd->syntf \
                    --model arg/mnd->qent+dv
-
-popd
 
 popd
