@@ -151,7 +151,7 @@ class FrameBrowserUI[VerbType, Arg: Order](
   val StringLocal = new LocalState[String]
 
   val VerbsFetch = new CacheCallContent[Unit, Map[VerbType, Int]]
-  val VerbModelFetch = new CacheCallContent[(ClusterModelSpec, VerbType), VerbClusterModel[VerbType, Arg]]
+  val VerbModelFetch = new CacheCallContent[(ClusterModelSpec, VerbType), Option[VerbClusterModel[VerbType, Arg]]]
   val SentencesFetch = new CacheCallContent[VerbType, Set[String]]
   val SentenceFetch = new CacheCallContent[String, SentenceInfo[VerbType, Arg]]
   val InflectedFormSetFetch = new CacheCallContent[VerbType, List[InflectedForms]]
@@ -1343,76 +1343,82 @@ class FrameBrowserUI[VerbType, Arg: Order](
                       request = (modelSpec.value, verb.value),
                       sendRequest = { case (spec, verb) => props.verbService.getModel(spec, verb) }) {
                       case VerbModelFetch.Loading => <.div(S.loadingNotice)("Loading verb clusters...")
-                      case VerbModelFetch.Loaded(model) =>
+                      case VerbModelFetch.Loaded(modelOpt) =>
                         InflectedFormsLocal.make(initialValue = formList.headOption) { inflectedForms =>
                           ClusterSplittingSpecLocal.make(initialValue = cachedClusterSplittingSpec.value) { clusterSplittingSpec =>
                             // NOTE: assumes only verb tree. ignores extra roles. can fix later if necessary
-                            val verbTrees = clusterSplittingSpec.value.verbCriterion
-                              .splitTree[Set[VerbId]](model.verbClustering.clusterTreeOpt.get, _.size.toDouble)
-                              .sortBy(-_.size)
-                            val verbIndices = verbTrees.zipWithIndex.flatMap { case (tree, index) =>
-                              tree.values.flatMap(verbIds => verbIds.toVector.map(_ -> index))
-                            }.toMap
-                            // TODO: split down to how it was during verb clustering, then *possibly* re-cluster.
-                            val argClusterings = model.argumentClustering.split(argId => verbIndices(argId.verbId))
-                            val frames = verbTrees.zipWithIndex.map { case (verbTree, i) =>
-                              argClusterings.get(i) match {
-                                case None => ResolvedFrame(verbTree, Vector(), Map())
-                                case Some(argClustering) =>
-                                  val roleTrees = argClustering.clusterTreeOpt.foldMap { argTree =>
-                                    clusterSplittingSpec.value.argumentCriterion
-                                      .splitTree[Set[ArgumentId[Arg]]](argTree, _.size.toDouble)
-                                  }
-                                  ResolvedFrame(verbTree, roleTrees, argClustering.extraClusters)
+                            val framesOpt = modelOpt.map { model =>
+                              val verbTrees = clusterSplittingSpec.value.verbCriterion
+                                .splitTree[Set[VerbId]](model.verbClustering.clusterTreeOpt.get, _.size.toDouble)
+                                .sortBy(-_.size)
+                              val verbIndices = verbTrees.zipWithIndex.flatMap { case (tree, index) =>
+                                tree.values.flatMap(verbIds => verbIds.toVector.map(_ -> index))
+                              }.toMap
+                              // TODO: split down to how it was during verb clustering, then *possibly* re-cluster.
+                              val argClusterings = model.argumentClustering.split(argId => verbIndices(argId.verbId))
+                              val frames = verbTrees.zipWithIndex.map { case (verbTree, i) =>
+                                argClusterings.get(i) match {
+                                  case None => ResolvedFrame(verbTree, Vector(), Map())
+                                  case Some(argClustering) =>
+                                    val roleTrees = argClustering.clusterTreeOpt.foldMap { argTree =>
+                                      clusterSplittingSpec.value.argumentCriterion
+                                        .splitTree[Set[ArgumentId[Arg]]](argTree, _.size.toDouble)
+                                    }
+                                    ResolvedFrame(verbTree, roleTrees, argClustering.extraClusters)
+                                }
                               }
+                              frames
                             }
 
                             BoolLocal.make(false) { showMetrics =>
                               <.div(S.mainContainer)(
                                 helpModal,
                                 headerContainer(props.featureService, modelSpec, verbCounts, sortedVerbCounts, verb, options, showMetrics),
-                                SentencesFetch.make(
-                                  request = features.verbType,
-                                  sendRequest = verb => props.featureService(FeatureReq.Sentences(verb))) {
-                                  case SentencesFetch.Loading => <.div(S.loadingNotice)("Loading sentence IDs...")
-                                  case SentencesFetch.Loaded(_sentenceIds) =>
-                                    val sentenceIds = _sentenceIds.toList.sorted(sentenceIdOrder.toOrdering)
-                                    val initSentenceId = sentenceIds.head
-                                    StringLocal.make(initialValue = initSentenceId) { curSentenceId =>
-                                      IntOptLocal.make(None) { curHighlightedFrame =>
-                                        <.div(S.dataContainer)(
-                                          frameContainer(
-                                            props.verbService, cachedClusterSplittingSpec, clusterSplittingSpec,
-                                            formList, inflectedForms,
-                                            features, frames,
-                                            curSentenceId,
-                                            curHighlightedFrame
-                                          ),
-                                          if(showMetrics.value) <.div(S.dataContainer)(
-                                            npmiChart(features, frames)
-                                          ) else <.div(S.dataContainer)(
-                                            sentenceSelectionPane(
-                                              sentenceIds,
-                                              curSentenceId
-                                            ),
-                                            SentenceFetch.make(
-                                              request = curSentenceId.value,
-                                              sendRequest = sid => props.featureService(FeatureReq.Sentence(sid))) {
-                                              case SentenceFetch.Loading => <.div(S.loadingNotice)("Loading sentence...")
-                                              case SentenceFetch.Loaded(sentenceInfo) =>
-                                                sentenceDisplayPane(
-                                                  features.verbType,
-                                                  sentenceInfo,
-                                                  features,
-                                                  inflectedForms.value.getOrElse(genericVerbForms),
-                                                  frames,
-                                                  curHighlightedFrame
-                                                )
-                                            }
-                                          )
-                                        )
-                                      }
-                                    }
+                                framesOpt match {
+                                  case None => <.div(S.loadingNotice)(s"No model available for ${modelSpec.value}. Run it manually or rerun the browser with the --all flag.")
+                                  case Some(frames) => SentencesFetch.make(
+                                    request = features.verbType,
+                                    sendRequest = verb => props.featureService(FeatureReq.Sentences(verb))) {
+                                      case SentencesFetch.Loading => <.div(S.loadingNotice)("Loading sentence IDs...")
+                                      case SentencesFetch.Loaded(_sentenceIds) =>
+                                        val sentenceIds = _sentenceIds.toList.sorted(sentenceIdOrder.toOrdering)
+                                        val initSentenceId = sentenceIds.head
+                                        StringLocal.make(initialValue = initSentenceId) { curSentenceId =>
+                                          IntOptLocal.make(None) { curHighlightedFrame =>
+                                            <.div(S.dataContainer)(
+                                              frameContainer(
+                                                props.verbService, cachedClusterSplittingSpec, clusterSplittingSpec,
+                                                formList, inflectedForms,
+                                                features, frames,
+                                                curSentenceId,
+                                                curHighlightedFrame
+                                              ),
+                                              if(showMetrics.value) <.div(S.dataContainer)(
+                                                npmiChart(features, frames)
+                                              ) else <.div(S.dataContainer)(
+                                                sentenceSelectionPane(
+                                                  sentenceIds,
+                                                  curSentenceId
+                                                ),
+                                                SentenceFetch.make(
+                                                  request = curSentenceId.value,
+                                                  sendRequest = sid => props.featureService(FeatureReq.Sentence(sid))) {
+                                                  case SentenceFetch.Loading => <.div(S.loadingNotice)("Loading sentence...")
+                                                  case SentenceFetch.Loaded(sentenceInfo) =>
+                                                    sentenceDisplayPane(
+                                                      features.verbType,
+                                                      sentenceInfo,
+                                                      features,
+                                                      inflectedForms.value.getOrElse(genericVerbForms),
+                                                      frames,
+                                                      curHighlightedFrame
+                                                    )
+                                                }
+                                              )
+                                            )
+                                          }
+                                        }
+                                  }
                                 }
                               )
                             }
@@ -1460,7 +1466,7 @@ class FrameBrowserUI[VerbType, Arg: Order](
           ),
           <.div(S.helpModalBody)(
             <.p(
-              "This page presents the rolesets induced by the models in the ACL 2021 submission ",
+              "This page presents the rolesets induced by the models in the Findings of ACL 2021 paper",
               <.i("Semantic Role Induction Without Syntax"), ". ",
               "Explorable in this interface are the induced rolesets for the training set ",
               "of the CoNLL 2008 Shared Task distribution of PropBank. ",
@@ -1513,17 +1519,6 @@ class FrameBrowserUI[VerbType, Arg: Order](
               "just under the role name, their opacity corresponds to their relative proportion in the ",
               "data for that role. If you click one of the terms there, its probability will print in the ",
               "JavaScript console."
-            ),
-            <.h4("Errata"),
-            <.p(
-              "There was actually a mistake in the submitted version of the paper where we describe ",
-              "how we derive the question counts for each argument. We say we sum the questions ",
-              "for each span, weighing by its probability under a span detection model. In fact, we ",
-              "did not end up doing that, and instead we just take the mean of the counts for each ",
-              "span (this had worked best in development and it's what we had used for all of the numbers ",
-              "in the paper, but I had forgotten and misread the code). So the arguments (and their spans) ",
-              "get mostly equal weight, as you will see in the features for each argument ",
-              "listed in the sentence pane."
             ),
             <.h4("Thanks!"),
             <.p(

@@ -49,8 +49,8 @@ import scala.annotation.tailrec
 import freelog._
 import freelog.implicits._
 
-object FrameInductionApp extends CommandIOApp(
-  name = "mill -i qasrl-roles.modeling.jvm.runMain qasrl.roles.modeling.FrameInductionApp",
+object RoleInductionApp extends CommandIOApp(
+  name = "mill -i qasrl-roles.modeling.jvm.runMain qasrl.roles.modeling.RoleInductionApp",
   header = "Do role induction tasks.") {
 
   implicit val logLevel = LogLevel.Trace

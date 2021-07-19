@@ -61,16 +61,16 @@ object Serve extends CommandIOApp(
     implicit Log: EphemeralTreeLogger[IO, String]
   ): IO[Map[ClusterModelSpec, Map[VerbType, VerbClusterModel[VerbType, Arg]]]] = {
     ClusterModelSpec.all.map(getModelFromSpec).traverse {
-      case m: JointModel => FrameInductionApp.getVerbFrames(m, features)
+      case m: JointModel => RoleInductionApp.getVerbFrames(m, features)
           .flatMap(_.get)
-      case m: VerbModel => FrameInductionApp.getVerbClusters(m, features)
+      case m: VerbModel => RoleInductionApp.getVerbClusters(m, features)
           .flatMap(_.get)
           .map(clusterings =>
             clusterings.map { case (verbType, verbTree) =>
               verbType -> VerbClusterModel[VerbType, Arg](verbType, verbTree, Clustering(None, Map()))
             }
           )
-      case m: ArgumentModel => FrameInductionApp.getArgumentClusters(m, features)
+      case m: ArgumentModel => RoleInductionApp.getArgumentClusters(m, features)
           .flatMap(_.get)
           .map(clusterings =>
             clusterings.map { case (verbType, argClustering) =>
@@ -84,10 +84,42 @@ object Serve extends CommandIOApp(
     }.map(models => ClusterModelSpec.all.zip(models).toMap)
   }
 
+  def readPresentClusterModels[VerbType: Encoder : Decoder, Arg: Encoder : Decoder : Order](
+    features: Features[VerbType, Arg])(
+    implicit Log: EphemeralTreeLogger[IO, String]
+  ): IO[Map[ClusterModelSpec, Map[VerbType, VerbClusterModel[VerbType, Arg]]]] = {
+    ClusterModelSpec.all.map(getModelFromSpec).traverse {
+      case m: JointModel => RoleInductionApp.getVerbFrames(m, features)
+          .flatMap(_.read)
+      case m: VerbModel => RoleInductionApp.getVerbClusters(m, features)
+          .flatMap(_.read)
+          .map(
+            _.map(clusterings =>
+              clusterings.map { case (verbType, verbTree) =>
+                verbType -> VerbClusterModel[VerbType, Arg](verbType, verbTree, Clustering(None, Map()))
+              }
+            )
+          )
+      case m: ArgumentModel => RoleInductionApp.getArgumentClusters(m, features)
+          .flatMap(_.read)
+          .map(
+            _.map(clusterings =>
+              clusterings.map { case (verbType, argClustering) =>
+                val allArgIds = argClustering.clusterTreeOpt.foldMap(_.unorderedFold) ++ argClustering.extraClusters.unorderedFold
+                val allVerbIds = allArgIds.map(_.verbId)
+                val verbTree = MergeTree.Leaf(0.0, allVerbIds)
+                val verbClustering = Clustering(Some(verbTree))
+                verbType -> VerbClusterModel[VerbType, Arg](verbType, verbClustering, argClustering)
+              }
+            )
+          )
+    }.map(models => ClusterModelSpec.all.zip(models).collect { case (k, Some(m)) => k -> m }.toMap)
+  }
+
   def _runSpecified[VerbType: Encoder : Decoder, Arg: Encoder : Decoder : Order](
     features: Features[VerbType, Arg],
     pageService: org.http4s.HttpRoutes[IO],
-    port: Int)(
+    port: Int, all: Boolean)(
     implicit Log: EphemeralTreeLogger[IO, String]
   ): IO[ExitCode] = {
     val featureService = HttpUtil.makeHttpPostServer(FeatureService.baseService(features))
@@ -96,7 +128,11 @@ object Serve extends CommandIOApp(
 
     for {
       _ <- features.argQuestionDists.get
-      allVerbModels <- readAllClusterModels[VerbType, Arg](features)
+      allVerbModels <- {
+        if(all) readAllClusterModels[VerbType, Arg](features)
+        else readPresentClusterModels[VerbType, Arg](features)
+      }
+      _ <- IO(require(allVerbModels.nonEmpty))
       verbCounts = allVerbModels.head._2.mapVals(_.numVerbInstances)
       verbModelService = HttpUtil.makeHttpPostServer(
         VerbFrameService.basicIOService(verbCounts, allVerbModels)
@@ -121,7 +157,8 @@ object Serve extends CommandIOApp(
     mode: RunMode,
     domain: String,
     port: Int,
-    behindProxy: Boolean
+    behindProxy: Boolean,
+    all: Boolean
   ): IO[ExitCode] = {
     freelog.loggers.TimingEphemeralTreeFansiLogger.create().flatMap { implicit Log =>
       val portOpt = if(behindProxy) None else Some(port)
@@ -135,9 +172,9 @@ object Serve extends CommandIOApp(
       )
 
       dataSetting match {
-        case d @ DataSetting.Qasrl         => _runSpecified(FrameInductionApp.getFeatures(d, mode), pageService, port)
-        case d @ DataSetting.Ontonotes5(_) => _runSpecified(FrameInductionApp.getFeatures(d, mode), pageService, port)
-        case d @ DataSetting.CoNLL08(_)    => _runSpecified(FrameInductionApp.getFeatures(d, mode), pageService, port)
+        case d @ DataSetting.Qasrl         => _runSpecified(RoleInductionApp.getFeatures(d, mode), pageService, port, all)
+        case d @ DataSetting.Ontonotes5(_) => _runSpecified(RoleInductionApp.getFeatures(d, mode), pageService, port, all)
+        case d @ DataSetting.CoNLL08(_)    => _runSpecified(RoleInductionApp.getFeatures(d, mode), pageService, port, all)
       }
     }
   }
@@ -152,9 +189,9 @@ object Serve extends CommandIOApp(
       "js", metavar = "path", help = "Where to get the JS main file."
     )
 
-    val dataO = FrameInductionApp.dataO
+    val dataO = RoleInductionApp.dataO
 
-    val modeO = FrameInductionApp.modeO
+    val modeO = RoleInductionApp.modeO
 
     val domainO = Opts.option[String](
       "domain", metavar = "domain", help = "domain name the server is being hosted at."
@@ -168,11 +205,15 @@ object Serve extends CommandIOApp(
       "proxy", help = "Whether the server is behind an HTTPS reverse proxy."
     ).orFalse
 
+    val allO = Opts.flag(
+      "all", help = "Load all models, constructing clusterings if they haven't already been done (might take a while)"
+    ).orFalse
+
     // val domainRestrictionO = Opts.option[String](
     //   "domain", metavar = "http://...",
     //   help = "Domain to impose CORS restrictions to (otherwise, all domains allowed)."
     // ).map(NonEmptySet.of(_)).orNone
 
-    (jsDepsPathO, jsPathO, dataO, modeO, domainO, portO, proxyO).mapN(_run)
+    (jsDepsPathO, jsPathO, dataO, modeO, domainO, portO, proxyO, allO).mapN(_run)
   }
 }

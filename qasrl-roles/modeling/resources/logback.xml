@@ -1,6 +1,6 @@
 <configuration>
   <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-    <file>extra.log</file>
+    <file>stderr.log</file>
     <encoder>
       <pattern>%d{HH:mm:ss.SSS} [%-5level] %logger{35} - %msg%n</pattern>
     </encoder>
