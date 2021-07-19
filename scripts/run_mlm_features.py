@@ -220,20 +220,20 @@ class BertMLMFeatureBuilder(MLMFeatureBuilder):
 model = BertMLMFeatureBuilder(should_lemmatize = True)
 data_sources = {
     "dev": {
-        "path": "frame-induction/conll08/out/mlm-inputs/dev.jsonl.gz",
+        "path": "experiments/conll08/out/mlm-inputs/dev.jsonl.gz",
         "size": 1228
     },
     "train": {
-        "path": "frame-induction/conll08/out/mlm-inputs/train.jsonl.gz",
+        "path": "experiments/conll08/out/mlm-inputs/train.jsonl.gz",
         "size": 35566
     },
     "test": {
-        "path": "frame-induction/conll08/out/mlm-inputs/test.jsonl.gz",
+        "path": "experiments/conll08/out/mlm-inputs/test.jsonl.gz",
         "size": 2139
     }
 }
 final_vocab_size = 1024
-output_dir = "frame-induction/conll08/input/mlm"
+output_dir = "experiments/conll08/input/mlm"
 
 targets = {
     "devel:359:plunge:18",

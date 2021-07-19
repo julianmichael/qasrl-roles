@@ -25,18 +25,34 @@ popd
 
 pushd ..
 
-run_train () {
-    ./scripts/roles.sh run --data conll08-lemma --mode train --model $1
-}
+run_lemma () { ./scripts/roles.sh run --data conll08-lemma --mode test --model "$@" }
+run_sense () { ./scripts/roles.sh run --data conll08-sense --mode test --model "$@" }
 
-# main experiments
-run_train arg/syntf        # syntf
-run_train arg/mnd->syntf   # syntf +lex
-run_train arg/syntf+       # syntf +pass->act
-run_train arg/mnd->syntf+  # syntf +all rules
-run_train arg/qent+dv      # HUM-QQ
-run_train arg/qent         # HUM-QQ -cp
-run_train arg/mnd->qent    # HUM-QQ +lex
+# Main experiments (Table 3)
+run_lemma "arg/syntf"          # syntf
+run_lemma "arg/mnd->syntf"     # syntf +lex
+run_lemma "arg/syntf+"         # syntf +pass->act
+run_lemma "arg/mnd->syntf+"    # syntf +all rules
+run_lemma "arg/qent+dv"        # HUM-QQ
+run_lemma "arg/qent"           # HUM-QQ -cp
+run_lemma "arg/mnd->qent+dv"   # HUM-QQ +lex
+
+# Ablation/analysis experiments (Table 6)
+run_lemma "arg/mnd->qent_argadj+dv" # argument/adjunct oracle
+run_sense "arg/mnd->qent+dv"        # predicate sense oracle
+run_sense "arg/mnd->qent_argadj+dv" # combined oracle
+
+# Extra experiments used in appendix
+
+# Table 7
+run_lemma "arg/n->syntf" # negation rule only
+run_lemma "arg/m->syntf" # modal rule only
+run_lemma "arg/d->syntf" # discourse rule only
+# Table 8
+run_lemma "arg/mnd->qent" --tune entropy --tune num-clusters --tune oracle
+# Table 10
+run_lemma "arg/mnd->qent+pent" # HUM-QQ +lex +MI
+
 
 # ./scripts/roles.sh run --data conll08-lemma --mode train --model arg/syntf        # syntf
 # ./scripts/roles.sh run --data conll08-lemma --mode train --model arg/mnd->syntf   # syntf +lex

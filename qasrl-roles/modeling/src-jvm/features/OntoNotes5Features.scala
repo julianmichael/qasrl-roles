@@ -44,7 +44,7 @@ class OntoNotes5Features(
 
   import jjm.datasets.ontonotes5._
 
-  override val rootDir = Paths.get("frame-induction/ontonotes5")
+  override val rootDir = Paths.get("experiments/ontonotes5")
 
   val ontonotesPath = Paths.get("data/conll-formatted-ontonotes-5.0")
 

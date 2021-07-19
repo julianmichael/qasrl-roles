@@ -51,7 +51,7 @@ class GoldQasrlFeatures(
 
   def renderVerbType(verbType: InflectedForms): String = verbType.allForms.mkString(", ")
 
-  override val rootDir = Paths.get("frame-induction/qasrl")
+  override val rootDir = Paths.get("experiments/qasrl")
 
   val qasrlBankPath = Paths.get("../qasrl-bank/data/qasrl-v2_1")
 

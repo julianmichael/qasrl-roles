@@ -45,7 +45,7 @@ class CoNLL08Features(
   import jjm.datasets.PropBankPredicate
   import jjm.datasets.conll08._
 
-  override val rootDir = Paths.get("frame-induction/conll08")
+  override val rootDir = Paths.get("experiments/conll08")
 
   val dataService = new CoNLL08FileSystemService(Paths.get("data/conll08st"))
 
