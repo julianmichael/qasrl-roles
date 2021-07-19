@@ -53,14 +53,17 @@ run_lemma "arg/mnd->qent" --tune entropy --tune num-clusters --tune oracle
 # Table 10
 run_lemma "arg/mnd->qent+pent" # HUM-QQ +lex +MI
 
+# summarize results for tables
+./scripts/roles.sh summarize --data conll08-lemma --mode test
+./scripts/roles.sh summarize --data conll08-sense --mode test
 
-# ./scripts/roles.sh run --data conll08-lemma --mode train --model arg/syntf        # syntf
-# ./scripts/roles.sh run --data conll08-lemma --mode train --model arg/mnd->syntf   # syntf +lex
-# ./scripts/roles.sh run --data conll08-lemma --mode train --model arg/syntf+       # syntf +pass->act
-# ./scripts/roles.sh run --data conll08-lemma --mode train --model arg/mnd->syntf+  # syntf +all rules
-# ./scripts/roles.sh run --data conll08-lemma --mode train --model arg/qent+dv      # HUM-QQ
-# ./scripts/roles.sh run --data conll08-lemma --mode train --model arg/qent         # HUM-QQ -cp
-# ./scripts/roles.sh run --data conll08-lemma --mode train --model arg/mnd->qent    # HUM-QQ +lex
+# run feature analyses:    Tabs. 11-12    App. C      Fig. 1   Sec. 6.3
+./scripts/roles.sh analyze role-questions,rule-lexica,wh-npmis,sense-counts
+
+# run performance comparison to get most-improved predicates for Sec. 6.1 analysis
+./scripts/roles.sh compare --data conll08-lemma --mode test \
+                   --model arg/mnd->syntf \
+                   --model arg/mnd->qent+dv
 
 popd
 
