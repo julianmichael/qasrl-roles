@@ -15,8 +15,8 @@ val thisScalaJSVersion = "1.4.0"
 val evilplotVersion = "0.8.1-SNAPSHOT"
 
 // my libs
-val jjmVersion = "0.2.1-SNAPSHOT"
-val qasrlVersion = "0.3.1-SNAPSHOT"
+val jjmVersion = "0.2.0"
+val qasrlVersion = "0.3.0"
 val freelogVersion = "0.1.0"
 
 val catsCollectionsVersion = "0.9.1"
