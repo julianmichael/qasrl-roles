@@ -50,8 +50,8 @@ import freelog._
 import freelog.implicits._
 
 object FrameInductionApp extends CommandIOApp(
-  name = "mill -i qfirst.jvm.runMain qfirst.paraphrase.FrameInductionApp",
-  header = "Induce verb frames.") {
+  name = "mill -i qasrl-roles.modeling.jvm.runMain qasrl.roles.modeling.FrameInductionApp",
+  header = "Do role induction tasks.") {
 
   implicit val logLevel = LogLevel.Trace
 
