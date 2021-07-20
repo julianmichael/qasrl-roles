@@ -144,7 +144,6 @@ class CoNLL08Features(
   // TODO add unfiltered dataset separately for feature generation?
 
   val dataset: RunDataCell[NonMergingMap[String, CoNLL08Sentence]] = {
-    import scala.concurrent.ExecutionContext.Implicits.global
     splits.flatMap(split =>
       dataService
         .streamSentences[IO](split)
@@ -419,7 +418,6 @@ class CoNLL08Features(
 
   lazy val conll05Sentences: RunDataCell[NonMergingMap[String, conll05.CoNLL05Sentence]] = {
     import conll05._
-    import scala.concurrent.ExecutionContext.Implicits.global
     val service = new CoNLL05FileSystemService(conll05Path)
     conll05Splits.flatMap(split =>
       service.streamSentences[IO](split)
@@ -435,7 +433,6 @@ class CoNLL08Features(
   lazy val ptb2Sentences: Cell[NonMergingMap[ptb2.PTB2SentenceId, ptb2.PTB2Sentence]] =
     Cell {
       val service = new ptb2.PTB2FileSystemService(ptb2Path)
-      import scala.concurrent.ExecutionContext.Implicits.global
       service.streamFiles[IO]
         .evalMap(f => Log.trace(f.path.toString).as(f))
         .flatMap(f => Stream.emits[IO, ptb2.PTB2Sentence](f.sentences))
@@ -619,7 +616,6 @@ class CoNLL08Features(
   lazy val propbank1Sentences: Cell[NonMergingMap[ptb2.PTB2SentenceId, propbank1.PropBank1Sentence]] =
     Cell {
       val service = new propbank1.PropBank1FileSystemService(propbank1Path)
-      import scala.concurrent.ExecutionContext.Implicits.global
       service.streamSentences[IO]
         .evalMap(s => Log.trace(s.id.toString).as(NonMergingMap(s.id -> s)))
         .infoCompile("Reading PropBank sentences")(_.foldMonoid)
@@ -952,7 +948,6 @@ class CoNLL08Features(
 
   lazy val propbank3Sentences: Cell[NonMergingMap[propbank3.PropBank3SentenceId, propbank3.PropBank3Sentence]] = Cell {
     val service = new propbank3.PropBank3FileSystemService(propbank3Path)
-    import scala.concurrent.ExecutionContext.Implicits.global
     service.streamSentencesFromProps[IO]
       .evalMap(s => Log.trace(s.id.toString).as(NonMergingMap(s.id -> s)))
       .infoCompile("Reading PropBank sentences")(_.foldMonoid)
@@ -960,7 +955,6 @@ class CoNLL08Features(
 
   lazy val propbank3SentencesCoNLLStyle: Cell[NonMergingMap[propbank3.PropBank3SentenceId, propbank3.PropBank3SentenceCoNLLStyle]] = Cell {
     val service = new propbank3.PropBank3FileSystemService(propbank3Path)
-    import scala.concurrent.ExecutionContext.Implicits.global
     service.streamSentencesFromCoNLLSkels[IO]
       .evalMap(s => Log.trace(s.id.toString).as(NonMergingMap(s.id -> s)))
       .infoCompile("Reading PropBank sentences")(_.foldMonoid)

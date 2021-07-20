@@ -39,6 +39,21 @@ import monocle.function.{all => Optics}
 import freelog._
 import freelog.implicits._
 
+object Features {
+  def create(
+    setting: DataSetting, mode: RunMode)(
+    implicit Log: EphemeralTreeLogger[IO, String],
+    cs: ContextShift[IO]
+  ): Features[setting.VerbType, setting.Arg] = setting match {
+    case DataSetting.Qasrl => new GoldQasrlFeatures(mode)
+        .asInstanceOf[Features[setting.VerbType, setting.Arg]]
+    case DataSetting.Ontonotes5(assumeGoldVerbSense) => new OntoNotes5Features(mode, assumeGoldVerbSense)
+        .asInstanceOf[Features[setting.VerbType, setting.Arg]]
+    case DataSetting.CoNLL08(assumeGoldVerbSense) => new CoNLL08Features(mode, assumeGoldVerbSense)
+        .asInstanceOf[Features[setting.VerbType, setting.Arg]]
+  }
+
+}
 abstract class Features[VerbType : Encoder : Decoder, Arg](
   val mode: RunMode)(
   implicit cs: ContextShift[IO],

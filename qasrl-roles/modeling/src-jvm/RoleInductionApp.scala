@@ -433,18 +433,6 @@ object RoleInductionApp extends CommandIOApp(
       models.max.toString, clustering2)
   } yield ()
 
-  def getFeatures(
-    setting: DataSetting, mode: RunMode)(
-    implicit Log: EphemeralTreeLogger[IO, String]
-  ): Features[setting.VerbType, setting.Arg] = setting match {
-    case DataSetting.Qasrl => new GoldQasrlFeatures(mode)
-        .asInstanceOf[Features[setting.VerbType, setting.Arg]]
-    case DataSetting.Ontonotes5(assumeGoldVerbSense) => new OntoNotes5Features(mode, assumeGoldVerbSense)
-        .asInstanceOf[Features[setting.VerbType, setting.Arg]]
-    case DataSetting.CoNLL08(assumeGoldVerbSense) => new CoNLL08Features(mode, assumeGoldVerbSense)
-        .asInstanceOf[Features[setting.VerbType, setting.Arg]]
-  }
-
   val dataO = Opts.option[String](
     "data", metavar = DataSetting.all.mkString("|"), help = "Data setting to run in."
   ).mapValidated { setting =>
@@ -529,7 +517,7 @@ object RoleInductionApp extends CommandIOApp(
             _ <- Log.info(s"Mode: setup")
             dataSettings = dataSettingOpt.fold(DataSetting.all)(List(_))
             _ <- Log.info(s"Data: " + dataSettings.mkString(", "))
-            _ <- dataSettings.traverse(d => getFeatures(d, RunMode.Sanity).setup)
+            _ <- dataSettings.traverse(d => Features.create(d, RunMode.Sanity).setup)
           } yield ExitCode.Success
         }
       }
@@ -551,11 +539,11 @@ object RoleInductionApp extends CommandIOApp(
             // need to explicitly match here to make sure typeclass instances for VerbType/Arg are available
             _ <- data match {
               case d @ DataSetting.Qasrl =>
-                runModeling(model, getFeatures(d, mode), tuning)
+                runModeling(model, Features.create(d, mode), tuning)
               case d @ DataSetting.Ontonotes5(_) =>
-                runModeling(model, getFeatures(d, mode), tuning)
+                runModeling(model, Features.create(d, mode), tuning)
               case d @ DataSetting.CoNLL08(_) =>
-                runModeling(model, getFeatures(d, mode), tuning)
+                runModeling(model, Features.create(d, mode), tuning)
             }
           } yield ExitCode.Success
         }
@@ -578,9 +566,9 @@ object RoleInductionApp extends CommandIOApp(
               case d @ DataSetting.Qasrl =>
                 IO.raiseError(new IllegalArgumentException("Cannot evaluate on QA-SRL."))
               case d @ DataSetting.Ontonotes5(_) =>
-                runSummarize(getFeatures(d, mode).getIfPropBank.get)
+                runSummarize(Features.create(d, mode).getIfPropBank.get)
               case d @ DataSetting.CoNLL08(_) =>
-                runSummarize(getFeatures(d, mode).getIfPropBank.get)
+                runSummarize(Features.create(d, mode).getIfPropBank.get)
             }
           } yield ExitCode.Success
         }
@@ -603,9 +591,9 @@ object RoleInductionApp extends CommandIOApp(
               case d @ DataSetting.Qasrl =>
                 IO.raiseError(new IllegalArgumentException("Cannot run analysis on QA-SRL."))
               case d @ DataSetting.Ontonotes5(_) =>
-                runAnalyze(getFeatures(d, mode).getIfPropBank.get, analysisChoices)
+                runAnalyze(Features.create(d, mode).getIfPropBank.get, analysisChoices)
               case d @ DataSetting.CoNLL08(_) =>
-                runAnalyze(getFeatures(d, mode).getIfPropBank.get, analysisChoices)
+                runAnalyze(Features.create(d, mode).getIfPropBank.get, analysisChoices)
             }
           } yield ExitCode.Success
         }
@@ -629,9 +617,9 @@ object RoleInductionApp extends CommandIOApp(
                   case d @ DataSetting.Qasrl =>
                     IO.raiseError(new IllegalArgumentException("Cannot run analysis on QA-SRL."))
                   case d @ DataSetting.Ontonotes5(_) =>
-                    runCompare(getFeatures(d, mode).getIfPropBank.get, models)
+                    runCompare(Features.create(d, mode).getIfPropBank.get, models)
                   case d @ DataSetting.CoNLL08(_) =>
-                    runCompare(getFeatures(d, mode).getIfPropBank.get, models)
+                    runCompare(Features.create(d, mode).getIfPropBank.get, models)
                 }
             }
           } yield ExitCode.Success

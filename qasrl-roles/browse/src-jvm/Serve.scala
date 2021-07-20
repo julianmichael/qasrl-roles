@@ -121,35 +121,32 @@ object Serve extends CommandIOApp(
     pageService: org.http4s.HttpRoutes[IO],
     port: Int, all: Boolean)(
     implicit Log: EphemeralTreeLogger[IO, String]
-  ): IO[ExitCode] = {
-    val featureService = HttpUtil.makeHttpPostServer(FeatureService.baseService(features))
-
-    import scala.concurrent.duration._
-
-    for {
-      _ <- features.argQuestionDists.get
-      allVerbModels <- {
-        if(all) readAllClusterModels[VerbType, Arg](features)
-        else readPresentClusterModels[VerbType, Arg](features)
-      }
-      _ <- IO(require(allVerbModels.nonEmpty))
-      verbCounts = allVerbModels.head._2.mapVals(_.numVerbInstances)
-      verbModelService = HttpUtil.makeHttpPostServer(
-        VerbFrameService.basicIOService(verbCounts, allVerbModels)
-      )
-      app = Router(
-        "/" -> pageService,
-        s"/$verbApiSuffix" -> verbModelService,
-        s"/$featureApiSuffix" -> featureService
-      ).orNotFound
-      _ <- Log.info("Starting server.")
-      _ <- BlazeServerBuilder[IO](global)
-      .withIdleTimeout(5.minutes)
-      .bindHttp(port, "0.0.0.0")
-      .withHttpApp(app)
-      .serve.compile.drain
-    } yield ExitCode.Success
-  }
+  ): IO[ExitCode] = for {
+    _ <- features.argQuestionDists.get
+    allVerbModels <- {
+      if(all) readAllClusterModels[VerbType, Arg](features)
+      else readPresentClusterModels[VerbType, Arg](features)
+    }
+    _ <- IO(require(allVerbModels.nonEmpty))
+    verbCounts = allVerbModels.head._2.mapVals(_.numVerbInstances)
+    verbModelService = HttpUtil.makeHttpPostServer(
+      VerbFrameService.basicIOService(verbCounts, allVerbModels)
+    )
+    featureService = HttpUtil.makeHttpPostServer(FeatureService.baseService(features))
+    app = Router(
+      "/" -> pageService,
+      s"/$verbApiSuffix" -> verbModelService,
+      s"/$featureApiSuffix" -> featureService
+    ).orNotFound
+    _ <- Log.info("Starting server.")
+    _ <- BlazeServerBuilder[IO](global).withIdleTimeout {
+      import scala.concurrent.duration._
+      5.minutes
+    }
+    .bindHttp(port, "0.0.0.0")
+    .withHttpApp(app)
+    .serve.compile.drain
+  } yield ExitCode.Success
 
   def _run(
     jsDepsPath: Path, jsPath: Path,
@@ -160,7 +157,7 @@ object Serve extends CommandIOApp(
     behindProxy: Boolean,
     all: Boolean
   ): IO[ExitCode] = {
-    freelog.loggers.TimingEphemeralTreeFansiLogger.create().flatMap { implicit Log =>
+    freelog.loggers.TimingEphemeralTreeFansiLogger.debounced().flatMap { implicit Log =>
       val portOpt = if(behindProxy) None else Some(port)
       val useHttps = behindProxy
 
@@ -172,9 +169,9 @@ object Serve extends CommandIOApp(
       )
 
       dataSetting match {
-        case d @ DataSetting.Qasrl         => _runSpecified(RoleInductionApp.getFeatures(d, mode), pageService, port, all)
-        case d @ DataSetting.Ontonotes5(_) => _runSpecified(RoleInductionApp.getFeatures(d, mode), pageService, port, all)
-        case d @ DataSetting.CoNLL08(_)    => _runSpecified(RoleInductionApp.getFeatures(d, mode), pageService, port, all)
+        case d @ DataSetting.Qasrl         => _runSpecified(Features.create(d, mode), pageService, port, all)
+        case d @ DataSetting.Ontonotes5(_) => _runSpecified(Features.create(d, mode), pageService, port, all)
+        case d @ DataSetting.CoNLL08(_)    => _runSpecified(Features.create(d, mode), pageService, port, all)
       }
     }
   }
